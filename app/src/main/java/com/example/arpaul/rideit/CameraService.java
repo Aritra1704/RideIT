@@ -40,7 +40,7 @@ public class CameraService extends Service implements GPSCallback {
         return null;
     }
 
-    private String FOLDER_PATH = ".RideIT";
+    private String FOLDER_PATH = "RideIT";
 
     @Override
     public void onStart(Intent intent, int startId) {
@@ -60,7 +60,7 @@ public class CameraService extends Service implements GPSCallback {
 
     }
 
-    private void setupAlarm(){
+    /*private void setupAlarm(){
         Calendar cal = Calendar.getInstance();
 
         //Intent intent = new Intent(this, CameraService.class);
@@ -69,14 +69,14 @@ public class CameraService extends Service implements GPSCallback {
         PendingIntent pintent = PendingIntent.getBroadcast(this,1201, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 // schedule for every 30 seconds
-        /*alarm.setRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), REPEAT_TIME, pintent);*/
+        *//*alarm.setRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), REPEAT_TIME, pintent);*//*
 
         //cal.add(Calendar.SECOND, 30);
         //
         // Fetch every 30 seconds
         // InexactRepeating allows Android to optimize the energy consumption
         alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), AppConstant.REPEAT_TIME, pintent);
-    }
+    }*/
 
     @Override
     public void gotGpsValidationResponse(Object response, GPSErrorCode code)
@@ -98,7 +98,6 @@ public class CameraService extends Service implements GPSCallback {
             currentLatLng = (LatLng) response;
             if(!isPhotoTaken){
                 takePhoto(currentLatLng);
-                gpsUtills.stopLocationUpdates();
                 LogUtils.debug("GPSTrack", "Currrent latLng :"+currentLatLng.latitude+" \n"+currentLatLng.longitude);
             }
 
@@ -118,8 +117,9 @@ public class CameraService extends Service implements GPSCallback {
             camera.setLocation(currentLatLng.latitude,currentLatLng.longitude);
             camera.takePicture();
         }
-
-        setupAlarm();
+        gpsUtills.stopLocationUpdates();
+        //setupAlarm();
+        stopSelf();
     }
     @Override
     public void onDestroy() {

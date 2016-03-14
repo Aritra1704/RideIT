@@ -64,20 +64,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         btnStartRide.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(!rideStarted)
+                if(!rideStarted){
                     setupAlarm();
-                else
+                    btnStartRide.setText("Stop Ride");
+                }
+                else {
                     stopAlarm();
+                    btnStartRide.setText("Start Ride");
+                }
             }
         });
     }
 
+    Intent intent;
     private void setupAlarm(){
         Calendar cal = Calendar.getInstance();
 
         //Intent intent = new Intent(this, CameraService.class);
         //PendingIntent pintent = PendingIntent.getService(this, 1201, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        Intent intent = new Intent(this, MyWakefulReceiver.class);
+        intent = new Intent(this, MyWakefulReceiver.class);
         PendingIntent pintent = PendingIntent.getBroadcast(this,1201, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 // schedule for every 30 seconds
@@ -188,6 +193,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     markerOptions.title("Your Location");
                     mMap.addMarker(markerOptions);
                     mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng,16.0f));
+
+                    gpsUtills.stopLocationUpdates();
                 }
             }
         }

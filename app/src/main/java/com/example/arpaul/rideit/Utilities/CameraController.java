@@ -3,11 +3,6 @@ package com.example.arpaul.rideit.Utilities;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.Environment;
 import android.view.SurfaceView;
@@ -144,8 +139,7 @@ public class CameraController {
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
 
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),folderpath);
-
+        File mediaStorageDir = new File(Environment.getExternalStorageDirectory(),folderpath);
         // This location works best if you want the created images to be shared
         // between applications and persist after your app has been uninstalled.
 
@@ -173,61 +167,39 @@ public class CameraController {
     private void setLocationonPhoto(File pictureFile){
         OutputStream outStream = null;
         try {
-            BitmapFactory.Options bmOptions = new BitmapFactory.Options();
-            Bitmap bitmap = BitmapFactory.decodeFile(pictureFile.getAbsolutePath(),bmOptions);
-            Bitmap drawableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+            Bitmap bmp = BitmapUtils.decodeSampledBitmapFromResource(pictureFile, 480,600);
+            Bitmap bitmapProcessed = getBitMap(bmp,CalendarUtils.getCurrentDateTime());
 
-            float scale = context.getResources().getDisplayMetrics().density;
-            Canvas canvas = new Canvas(drawableBitmap);
-            // new antialised Paint
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            // text color - #3D3D3D
-            paint.setColor(Color.rgb(61, 61, 61));
-            // text size in pixels
-            paint.setTextSize((int) (14 * scale));
-            // text shadow
-            paint.setShadowLayer(1f, 0f, 1f, Color.WHITE);
-
-            String lat = "Latitude: " + latitude;
-            String lng = "Longitude: " + longitude;
-            String Date = "Date: " + CalendarUtils.getCommaFormattedDateTime(timeStamp);
-            // draw text to the Canvas center
-            Rect bounds = new Rect();
-            paint.getTextBounds(lat, 0, lat.length(), bounds);
-            int x = (bitmap.getWidth() - bounds.width())/2;
-            int y = (bitmap.getHeight() + bounds.height())/2 + 50;
-
-            canvas.drawText(lat, x, y, paint);
-
-            bounds = new Rect();
-            paint.getTextBounds(lng, 0, lng.length(), bounds);
-            x = (bitmap.getWidth() - bounds.width())/2;
-            y = (bitmap.getHeight() + bounds.height())/2 + 30;
-
-            canvas.drawText(lng, x, y, paint);
-
-            bounds = new Rect();
-            paint.getTextBounds(Date, 0, Date.length(), bounds);
-            x = (bitmap.getWidth() - bounds.width())/2;
-            y = (bitmap.getHeight() + bounds.height())/2 + 10;
-
-            canvas.drawText(Date, x, y, paint);
-
-            if (pictureFile.exists()) {
-                pictureFile.delete();
-                pictureFile = getOutputMediaFile();
+            if (pictureFile.exists ())
+                pictureFile.delete ();
+            try
+            {
+                FileOutputStream out = new FileOutputStream(pictureFile);
+                bitmapProcessed.compress(Bitmap.CompressFormat.PNG, 100, out);
+                out.flush();
+                out.close();
             }
-            try {
-                outStream = new FileOutputStream(pictureFile);
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outStream);
-                outStream.flush();
-                outStream.close();
-            } catch (Exception e) {
+            catch (Exception e)
+            {
                 e.printStackTrace();
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+    }
+
+    private Bitmap getBitMap(Bitmap bmp,String date)
+    {
+        Bitmap mBtBitmap = null;
+        if(bmp != null)
+        {
+            mBtBitmap = BitmapUtils.processBitmap(bmp, date,latitude,longitude);
+            if(bmp!=null && !bmp.isRecycled())
+                bmp.recycle();
+            return mBtBitmap;
+        }
+        return mBtBitmap;
     }
 }

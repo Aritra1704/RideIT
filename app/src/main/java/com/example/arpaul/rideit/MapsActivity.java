@@ -1,14 +1,20 @@
 package com.example.arpaul.rideit;
 
+import android.Manifest;
 import android.app.AlarmManager;
 import android.app.Dialog;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.view.View;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -19,6 +25,7 @@ import com.example.arpaul.rideit.GPSUtilities.GPSUtills;
 import com.example.arpaul.rideit.Receiver.MyWakefulReceiver;
 import com.example.arpaul.rideit.Utilities.CustomLoader;
 import com.example.arpaul.rideit.Utilities.LogUtils;
+import com.example.arpaul.rideit.Utilities.UnCaughtException;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -43,37 +50,70 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private boolean isGpsProviderEnabled;
     private Button btnStartRide;
     private boolean rideStarted = false;
-
+    private boolean ispermissionGranted = false;
+    private static final int MY_PERMISSION_LOCATION_PHONE = 11;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Thread.setDefaultUncaughtExceptionHandler(new UnCaughtException(MapsActivity.this));
+        this.requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.map_activity);
 
         initialiseControls();
 
-        //Gps
-        gpsUtills = GPSUtills.getInstance(MapsActivity.this);
-        gpsUtills.setLogEnable(true);
-        gpsUtills.setPackegeName(getPackageName());
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        {
+            int hasLocationPermission = checkSelfPermission( Manifest.permission.ACCESS_FINE_LOCATION );
+            if( hasLocationPermission != PackageManager.PERMISSION_GRANTED ) {
+                ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.READ_CONTACTS,Manifest.permission.ACCESS_COARSE_LOCATION},1);
+            }
+        } else {
+            ispermissionGranted = true;
+            //Gps
+            gpsUtills = GPSUtills.getInstance(MapsActivity.this);
+            gpsUtills.setLogEnable(true);
+            gpsUtills.setPackegeName(getPackageName());
 
-        gpsUtills.setListner(MapsActivity.this);
-        gpsUtills.isGpsProviderEnabled();
+            gpsUtills.setListner(MapsActivity.this);
+            gpsUtills.isGpsProviderEnabled();
+        }
+
+        int permissionCheck = ContextCompat.checkSelfPermission(MapsActivity.this, Manifest.permission.ACCESS_FINE_LOCATION);
 
         loader = new CustomLoader(MapsActivity.this);
 
         btnStartRide.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(!rideStarted){
-                    setupAlarm();
-                    btnStartRide.setText("Stop Ride");
-                }
-                else {
-                    stopAlarm();
-                    btnStartRide.setText("Start Ride");
+                if(ispermissionGranted){
+                    if(!rideStarted){
+                        setupAlarm();
+                        btnStartRide.setText("Stop Ride");
+                    }
+                    else {
+                        stopAlarm();
+                        btnStartRide.setText("Start Ride");
+                    }
                 }
             }
         });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == 1)
+        {
+            ispermissionGranted = true;
+            //Gps
+            gpsUtills = GPSUtills.getInstance(MapsActivity.this);
+            gpsUtills.setLogEnable(true);
+            gpsUtills.setPackegeName(getPackageName());
+
+            gpsUtills.setListner(MapsActivity.this);
+            gpsUtills.isGpsProviderEnabled();
+        }
     }
 
     Intent intent;

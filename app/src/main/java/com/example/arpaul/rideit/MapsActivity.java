@@ -56,7 +56,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private boolean rideStarted = false;
     private boolean ispermissionGranted = false;
     private static final int MY_PERMISSION_LOCATION_PHONE = 11;
-    private GoogleApiClient client;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,7 +98,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         });
-        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
     private void createGPSUtils(){
@@ -171,7 +169,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        gpsUtills.isGpsProviderEnabled();
+        if(gpsUtills != null)
+            gpsUtills.isGpsProviderEnabled();
         if(isGpsProviderEnabled)
         {
             //loader.showLoader("Please wait..");
@@ -183,7 +182,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 {
                     loader.hideLoader();
                     gpsUtills.getCurrentLatLng();
-                    if(currentLatLng.latitude > 0.0 && currentLatLng.longitude > 0.0)
+                    if(currentLatLng != null && currentLatLng.latitude > 0.0 && currentLatLng.longitude > 0.0)
                     {
                         String latLng = currentLatLng.latitude+","+currentLatLng.longitude;
                         if(mMap!=null)
@@ -213,7 +212,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if(code == GPSErrorCode.EC_GPS_PROVIDER_NOT_ENABLED)
         {
             isGpsProviderEnabled = false;
-            //showSettingsAlert();
+            showSettingsAlert();
         }
         else if(code == GPSErrorCode.EC_GPS_PROVIDER_ENABLED)
         {
@@ -258,20 +257,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onStart()
     {
         super.onStart();
-        gpsUtills.connectGoogleApiClient();
-
-        client.connect();
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "Maps Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app URL is correct.
-                Uri.parse("android-app://com.example.arpaul.rideit.Activity/http/host/path")
-        );
-        AppIndex.AppIndexApi.start(client, viewAction);
+        if(gpsUtills != null)
+            gpsUtills.connectGoogleApiClient();
     }
 
     @Override
@@ -281,18 +268,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if(gpsUtills != null)
             gpsUtills.disConnectGoogleApiClient();
 
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "Maps Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app URL is correct.
-                Uri.parse("android-app://com.example.arpaul.rideit.Activity/http/host/path")
-        );
-        AppIndex.AppIndexApi.end(client, viewAction);
-        client.disconnect();
+
     }
 
     @Override
@@ -321,7 +297,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     public void showSettingsAlert()
     {
-        Toast.makeText(MapsActivity.this, "GPS is not enabled.So please enable GPS for better Location.", Toast.LENGTH_LONG).show();
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(MapsActivity.this, "GPS is not enabled.So please enable GPS for better Location.", Toast.LENGTH_LONG).show();
+            }
+        });
+
     }
 
     public void showGoogleUpdateServiceAlert()

@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
@@ -26,8 +27,11 @@ import com.example.arpaul.rideit.Receiver.MyWakefulReceiver;
 import com.example.arpaul.rideit.Utilities.CustomLoader;
 import com.example.arpaul.rideit.Utilities.LogUtils;
 import com.example.arpaul.rideit.Utilities.UnCaughtException;
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -52,6 +56,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private boolean rideStarted = false;
     private boolean ispermissionGranted = false;
     private static final int MY_PERMISSION_LOCATION_PHONE = 11;
+    private GoogleApiClient client;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -66,16 +72,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             int hasLocationPermission = checkSelfPermission( Manifest.permission.ACCESS_FINE_LOCATION );
             if( hasLocationPermission != PackageManager.PERMISSION_GRANTED ) {
                 ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.READ_CONTACTS,Manifest.permission.ACCESS_COARSE_LOCATION},1);
+            } else {
+                createGPSUtils();
             }
         } else {
             ispermissionGranted = true;
-            //Gps
-            gpsUtills = GPSUtills.getInstance(MapsActivity.this);
-            gpsUtills.setLogEnable(true);
-            gpsUtills.setPackegeName(getPackageName());
-
-            gpsUtills.setListner(MapsActivity.this);
-            gpsUtills.isGpsProviderEnabled();
+            createGPSUtils();
         }
 
         int permissionCheck = ContextCompat.checkSelfPermission(MapsActivity.this, Manifest.permission.ACCESS_FINE_LOCATION);
@@ -97,6 +99,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         });
+        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
+    }
+
+    private void createGPSUtils(){
+        //Gps
+        gpsUtills = GPSUtills.getInstance(MapsActivity.this);
+        gpsUtills.setLogEnable(true);
+        gpsUtills.setPackegeName(getPackageName());
+
+        gpsUtills.setListner(MapsActivity.this);
+        gpsUtills.isGpsProviderEnabled();
     }
 
     @Override
@@ -106,13 +119,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (requestCode == 1)
         {
             ispermissionGranted = true;
-            //Gps
-            gpsUtills = GPSUtills.getInstance(MapsActivity.this);
-            gpsUtills.setLogEnable(true);
-            gpsUtills.setPackegeName(getPackageName());
-
-            gpsUtills.setListner(MapsActivity.this);
-            gpsUtills.isGpsProviderEnabled();
+            createGPSUtils();
         }
     }
 
@@ -252,34 +259,64 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     {
         super.onStart();
         gpsUtills.connectGoogleApiClient();
+
+        client.connect();
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Maps Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app URL is correct.
+                Uri.parse("android-app://com.example.arpaul.rideit.Activity/http/host/path")
+        );
+        AppIndex.AppIndexApi.start(client, viewAction);
     }
 
     @Override
     public void onStop()
     {
         super.onStop();
-        gpsUtills.disConnectGoogleApiClient();
+        if(gpsUtills != null)
+            gpsUtills.disConnectGoogleApiClient();
+
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Maps Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app URL is correct.
+                Uri.parse("android-app://com.example.arpaul.rideit.Activity/http/host/path")
+        );
+        AppIndex.AppIndexApi.end(client, viewAction);
+        client.disconnect();
     }
 
     @Override
     protected void onPause()
     {
         super.onPause();
-        gpsUtills.stopLocationUpdates();
+        if(gpsUtills != null)
+            gpsUtills.stopLocationUpdates();
     }
 
     @Override
     public void onResume()
     {
         super.onResume();
-        gpsUtills.startLocationUpdates();
+        if(gpsUtills != null)
+            gpsUtills.startLocationUpdates();
     }
 
     @Override
     public void onDestroy()
     {
         super.onDestroy();
-        gpsUtills.stopLocationUpdates();
+        if(gpsUtills != null)
+            gpsUtills.stopLocationUpdates();
     }
 
     public void showSettingsAlert()
@@ -289,7 +326,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     public void showGoogleUpdateServiceAlert()
     {
-
         updateGooglePlayServiceDialog = null;
 
         int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(MapsActivity.this);

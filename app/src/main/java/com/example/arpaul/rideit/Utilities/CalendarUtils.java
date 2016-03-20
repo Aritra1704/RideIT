@@ -1,7 +1,9 @@
 package com.example.arpaul.rideit.Utilities;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 
 /**
  * Created by ARPaul on 13-03-2016.
@@ -86,5 +88,40 @@ public class CalendarUtils {
         reqDate = simpleDateFormat.format(calendar.getTime());
 
         return reqDate;
+    }
+
+    public static int getDiffBtwDatesInMinutes(String startDate,String endDate)
+    {
+        Calendar calendar1 = Calendar.getInstance();
+        Calendar calendar2 = Calendar.getInstance();
+
+        calendar1.setTime(CalendarUtils.getDateFromString(startDate, CalendarUtils.DATE_TIME_FORMAT));
+        calendar2.setTime(CalendarUtils.getDateFromString(endDate, CalendarUtils.DATE_TIME_FORMAT));
+
+        long milliseconds1 = calendar1.getTimeInMillis();
+        long milliseconds2 = calendar2.getTimeInMillis();
+
+        long diff = milliseconds2 - milliseconds1;
+        int diffMins = (int) (diff / (60 * 1000));
+
+        return diffMins;
+    }
+
+    public static Date getDateFromString(String date,String pattern)
+    {
+        Date dateObj = new Date();
+        SimpleDateFormat sdf = new SimpleDateFormat(pattern);
+        try
+        {
+            dateObj = sdf.parse(date);
+        }
+        catch (ParseException e)
+        {
+            e.printStackTrace();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        return dateObj;
     }
 }

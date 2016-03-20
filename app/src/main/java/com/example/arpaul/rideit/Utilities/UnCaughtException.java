@@ -132,7 +132,7 @@ public class UnCaughtException implements UncaughtExceptionHandler {
 								int which) {
 							Intent sendIntent = new Intent(
 									Intent.ACTION_SEND);
-							String subject = "WINIT SFA Log.";
+							String subject = "Error Log.";
 							StringBuilder body = new StringBuilder("");
 							body.append(errorContent).append('\n')
 							.append('\n');
@@ -148,7 +148,7 @@ public class UnCaughtException implements UncaughtExceptionHandler {
 							System.exit(0);
 						}
 					});
-					builder.setMessage("Sorry for inconvenience. WINIT SFA app stopped working.");
+					builder.setMessage("Sorry for inconvenience. App stopped working.");
 					builder.show();
 					Looper.loop();
 				}

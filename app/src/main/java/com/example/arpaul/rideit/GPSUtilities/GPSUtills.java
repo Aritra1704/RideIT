@@ -95,7 +95,6 @@ public class GPSUtills
     	 {
     		 gpsCallback.gotGpsValidationResponse(isGpsProviderEnabled, GPSErrorCode.EC_GPS_PROVIDER_ENABLED);
     		 GPSLogutils.createLogDataForLib("isGpsProviderEnabled", "Gps Provider Enabled", "EC_GPS_PROVIDER_ENABLED");
-    		 
     	 }
     	 else
     	 {

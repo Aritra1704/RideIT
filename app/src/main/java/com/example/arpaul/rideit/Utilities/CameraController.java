@@ -3,14 +3,25 @@ package com.example.arpaul.rideit.Utilities;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
 import android.os.Environment;
-import android.view.SurfaceView;
+import android.util.SparseArray;
+
+import com.example.arpaul.rideit.Common.AppConstant;
+import com.example.arpaul.rideit.R;
+import com.example.arpaul.rideit.camera.CameraSource;
+import com.google.android.gms.vision.Frame;
+import com.google.android.gms.vision.face.Face;
+import com.google.android.gms.vision.face.FaceDetector;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 
 /**
@@ -21,17 +32,17 @@ public class CameraController {
 
     private boolean hasCamera;
 
-    private Camera camera;
+    private CameraSource camera;
     private int cameraId;
-    private String folderpath;
     private double latitude, longitude;
     private String timeStamp;
+    private CameraSource.PictureCallback mPicture;
 
-    public CameraController(Context c,String folderpath){
+    public CameraController(Context c,CameraSource.PictureCallback mPicture){
         context = c.getApplicationContext();
-        this.folderpath = folderpath;
+        this.mPicture = mPicture;
 
-        if(context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
+        /*if(context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
             cameraId = getFrontCameraId();
 
             if(cameraId != -1){
@@ -41,7 +52,7 @@ public class CameraController {
             }
         }else{
             hasCamera = false;
-        }
+        }*/
     }
 
     public boolean hasCamera(){
@@ -53,8 +64,10 @@ public class CameraController {
 
         if(hasCamera){
             try{
-                camera = Camera.open(cameraId);
-                prepareCamera();
+                FaceDetector facedetector = new FaceDetector.Builder(context).build();
+                CameraSource.Builder builder = new CameraSource.Builder(context, facedetector)
+                        .setFacing(CameraSource.CAMERA_FACING_FRONT)
+                        .setRequestedFps(15.0f);
             }
             catch(Exception e){
                 hasCamera = false;
@@ -64,93 +77,27 @@ public class CameraController {
 
     public void takePicture(){
         if(hasCamera){
-            camera.takePicture(null,null,mPicture);
+            System.gc();
+            camera.takePicture(null,mPicture);
         }
     }
 
     public void releaseCamera(){
         if(camera != null){
-            camera.stopPreview();
             camera.release();
             camera = null;
         }
     }
 
-    private int getFrontCameraId(){
-        int camId = -1;
-        int numberOfCameras = Camera.getNumberOfCameras();
-        Camera.CameraInfo ci = new Camera.CameraInfo();
+    public File getOutputMediaFile(){
+        File mediaStorageDir = new File(Environment.getExternalStorageDirectory(), AppConstant.FOLDER_PATH);
 
-        for(int i = 0;i < numberOfCameras;i++){
-            Camera.getCameraInfo(i,ci);
-            if(ci.facing == Camera.CameraInfo.CAMERA_FACING_FRONT){
-                camId = i;
-            }
-        }
-
-        return camId;
-    }
-
-    private void prepareCamera(){
-        SurfaceView view = new SurfaceView(context);
-
-        try{
-            camera.setPreviewDisplay(view.getHolder());
-        }catch(IOException e){
-            throw new RuntimeException(e);
-        }
-
-        camera.startPreview();
-
-        Camera.Parameters params = camera.getParameters();
-        params.setJpegQuality(100);
-
-        camera.setParameters(params);
-    }
-
-    private Camera.PictureCallback mPicture = new Camera.PictureCallback(){
-        @Override
-        public void onPictureTaken(byte[] data, Camera camera){
-            File pictureFile = getOutputMediaFile();
-
-            if(pictureFile == null){
-                LogUtils.debug("TEST", "Error creating media file, check storage permissions");
-                return;
-            }
-
-            try{
-                LogUtils.debug("TEST","File created");
-                FileOutputStream fos = new FileOutputStream(pictureFile);
-                fos.write(data);
-                fos.close();
-
-            }catch(FileNotFoundException e){
-                LogUtils.debug("TEST","File not found: "+e.getMessage());
-            } catch (IOException e){
-                LogUtils.debug("TEST","Error accessing file: "+e.getMessage());
-            }
-
-            setLocationonPhoto(pictureFile);
-            releaseCamera();
-        }
-    };
-
-    private File getOutputMediaFile(){
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
-
-        File mediaStorageDir = new File(Environment.getExternalStorageDirectory(),folderpath);
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
-
-        // Create the storage directory if it does not exist
         if(!mediaStorageDir.exists()){
             if(!mediaStorageDir.mkdirs()){
                 return null;
             }
         }
 
-        // Create a media file name
         timeStamp = CalendarUtils.getCurrentDateTime();
 
         File mediaFile;
@@ -164,11 +111,42 @@ public class CameraController {
         this.longitude = longitude;
     }
 
-    private void setLocationonPhoto(File pictureFile){
+    public void setLocationonPhoto(File pictureFile){
         OutputStream outStream = null;
         try {
-            Bitmap bmp = BitmapUtils.decodeSampledBitmapFromResource(pictureFile, 480,600);
-            Bitmap bitmapProcessed = getBitMap(bmp,CalendarUtils.getCurrentDateTime());
+
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inMutable=true;
+            Bitmap myBitmap = BitmapUtils.decodeSampledBitmapFromResource(pictureFile, 480,600);
+
+            Paint myRectPaint = new Paint();
+            myRectPaint.setStrokeWidth(5);
+            myRectPaint.setColor(Color.RED);
+            myRectPaint.setStyle(Paint.Style.STROKE);
+
+            Bitmap tempBitmap = Bitmap.createBitmap(myBitmap.getWidth(), myBitmap.getHeight(), Bitmap.Config.RGB_565);
+            Canvas tempCanvas = new Canvas(tempBitmap);
+            tempCanvas.drawBitmap(myBitmap, 0, 0, null);
+
+            FaceDetector faceDetector = new FaceDetector.Builder(context).setTrackingEnabled(false).build();
+            if(!faceDetector.isOperational()){
+
+                return;
+            }
+
+            Frame frame = new Frame.Builder().setBitmap(myBitmap).build();
+            SparseArray<Face> faces = faceDetector.detect(frame);
+
+            for(int i=0; i<faces.size(); i++) {
+                Face thisFace = faces.valueAt(i);
+                float x1 = thisFace.getPosition().x;
+                float y1 = thisFace.getPosition().y;
+                float x2 = x1 + thisFace.getWidth();
+                float y2 = y1 + thisFace.getHeight();
+                tempCanvas.drawRoundRect(new RectF(x1, y1, x2, y2), 2, 2, myRectPaint);
+            }
+
+            Bitmap bitmapProcessed = getBitMap(myBitmap,CalendarUtils.getCurrentDateTime());
 
             if (pictureFile.exists ())
                 pictureFile.delete ();

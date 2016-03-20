@@ -1,30 +1,36 @@
 package com.example.arpaul.rideit;
 
-import android.app.AlarmManager;
-import android.app.Dialog;
-import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
+import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.support.annotation.Nullable;
 
-import com.example.arpaul.rideit.Common.AppConstant;
+import com.example.arpaul.rideit.Common.AppPreference;
 import com.example.arpaul.rideit.GPSUtilities.GPSCallback;
 import com.example.arpaul.rideit.GPSUtilities.GPSErrorCode;
 import com.example.arpaul.rideit.GPSUtilities.GPSUtills;
-import com.example.arpaul.rideit.Receiver.MyWakefulReceiver;
+import com.example.arpaul.rideit.Utilities.CalendarUtils;
 import com.example.arpaul.rideit.Utilities.CameraController;
-import com.example.arpaul.rideit.Utilities.CustomLoader;
 import com.example.arpaul.rideit.Utilities.LogUtils;
+import com.example.arpaul.rideit.camera.CameraSource;
 import com.google.android.gms.maps.model.LatLng;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.util.Calendar;
 
 /**
  * Created by ARPaul on 13-03-2016.
  */
-public class CameraService extends Service implements GPSCallback {
+public class CameraService extends Service implements GPSCallback, CameraSource.PictureCallback {
 
     private GPSUtills gpsUtills;
     //Gps
@@ -35,17 +41,18 @@ public class CameraService extends Service implements GPSCallback {
     private CameraController camera;
 
     @Nullable
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
     }
 
-    private String FOLDER_PATH = "RideIT";
-
     @Override
-    public void onStart(Intent intent, int startId) {
-        super.onStart(intent, startId);
+    public int onStartCommand(Intent intent, int flags, int startId) {
 
+        String lastPhoto = new AppPreference(CameraService.this).getStringFromPreference(AppPreference.IS_STARTED,"");
+        if(CalendarUtils.getDiffBtwDatesInMinutes(lastPhoto,CalendarUtils.getCurrentDateTime()) < 5)
+            stopSelf();
         //Gps
         gpsUtills = GPSUtills.getInstance(CameraService.this);
         gpsUtills.setLogEnable(true);
@@ -55,28 +62,55 @@ public class CameraService extends Service implements GPSCallback {
         gpsUtills.isGpsProviderEnabled();
         gpsUtills.connectGoogleApiClient();
         gpsUtills.startLocationUpdates();
+        getCurrentLocation();
 
-        camera = new CameraController(CameraService.this,FOLDER_PATH);
+        camera = new CameraController(CameraService.this,CameraService.this);
 
+        //to read the logcat programmatically
+        try {
+            Process process = Runtime.getRuntime().exec("logcat -d");
+            BufferedReader bufferedReader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
+
+            StringBuilder log=new StringBuilder();
+            String line;
+            while ((line = bufferedReader.readLine()) != null)
+            {
+                log.append(line);
+            }
+
+            //to create a Text file name "logcat.txt" in SDCard
+            File sdCard = Environment.getExternalStorageDirectory();
+            File dir = new File (sdCard.getAbsolutePath() + "/myLogcat");
+            dir.mkdirs();
+            File file = new File(dir, "logcat.txt");
+
+            FileOutputStream fOut = new FileOutputStream(file);
+            OutputStreamWriter osw = new OutputStreamWriter(fOut);
+
+            // Write the string to the file
+            osw.write(log.toString());
+            osw.flush();
+            osw.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return Service.START_STICKY;
     }
 
-    /*private void setupAlarm(){
-        Calendar cal = Calendar.getInstance();
-
-        //Intent intent = new Intent(this, CameraService.class);
-        //PendingIntent pintent = PendingIntent.getService(this, 1201, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        Intent intent = new Intent(this, MyWakefulReceiver.class);
-        PendingIntent pintent = PendingIntent.getBroadcast(this,1201, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-        AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-// schedule for every 30 seconds
-        *//*alarm.setRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), REPEAT_TIME, pintent);*//*
-
-        //cal.add(Calendar.SECOND, 30);
-        //
-        // Fetch every 30 seconds
-        // InexactRepeating allows Android to optimize the energy consumption
-        alarm.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), AppConstant.REPEAT_TIME, pintent);
-    }*/
+    private void getCurrentLocation(){
+        new Handler().postDelayed(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                gpsUtills.getCurrentLatLng();
+            }
+        }, 2 * 1000);
+    }
 
     @Override
     public void gotGpsValidationResponse(Object response, GPSErrorCode code)
@@ -111,7 +145,7 @@ public class CameraService extends Service implements GPSCallback {
 
     private void takePhoto(LatLng currentLatLng){
         if(camera == null)
-            camera = new CameraController(CameraService.this,FOLDER_PATH);
+            camera = new CameraController(CameraService.this,CameraService.this);
         if(camera.hasCamera()){
             camera.getCameraInstance();
             camera.setLocation(currentLatLng.latitude,currentLatLng.longitude);
@@ -119,11 +153,37 @@ public class CameraService extends Service implements GPSCallback {
         }
         gpsUtills.stopLocationUpdates();
         //setupAlarm();
+        new AppPreference(CameraService.this).saveStringInPreference(AppPreference.LAST_PHOTO , CalendarUtils.getCurrentDateTime());
         stopSelf();
     }
     @Override
     public void onDestroy() {
         super.onDestroy();
         gpsUtills.disConnectGoogleApiClient();
+    }
+
+    @Override
+    public void onPictureTaken(byte[] data) {
+        File pictureFile = camera.getOutputMediaFile();
+
+        if(pictureFile == null){
+            LogUtils.debug("TEST", "Error creating media file, check storage permissions");
+            return;
+        }
+
+        try{
+            LogUtils.debug("TEST","File created");
+            FileOutputStream fos = new FileOutputStream(pictureFile);
+            fos.write(data);
+            fos.close();
+
+        }catch(FileNotFoundException e){
+            LogUtils.debug("TEST","File not found: "+e.getMessage());
+        } catch (IOException e){
+            LogUtils.debug("TEST","Error accessing file: "+e.getMessage());
+        }
+
+        camera.setLocationonPhoto(pictureFile);
+        camera.releaseCamera();
     }
 }
